@@ -4,5 +4,3 @@
   "buildCommand": "bun run build",
   "outputDirectory": "dist/client"
 }
-
-warning: in the working copy of 'vercel.json', LF will be replaced by CRLF the next time Git touches it
