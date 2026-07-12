@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import ximosaiHeader from "@/assets/ximosai-header.png.asset.json";
+import ximosaiHeaderUrl from "@/assets/ximosai-header.jpeg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,9 +58,9 @@ function LectorGuiado() {
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const utteranceStartTimeRef = useRef(0);
   const boundaryFiredRef = useRef(false);
-  // Cuando true, el scroll automático queda desactivado hasta que el usuario pulse Seguir.
+  // Cuando true, el scroll automÃ¡tico queda desactivado hasta que el usuario pulse Seguir.
   const autoScrollDesactivadoRef = useRef(false);
-  // Long-press detection (2s → pausa total y modo manual)
+  // Long-press detection (2s â†’ pausa total y modo manual)
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressMovedRef = useRef(false);
   const [instruccionesAbiertas, setInstruccionesAbiertas] = useState(false);
@@ -68,23 +68,23 @@ function LectorGuiado() {
   const [avisoPdf, setAvisoPdf] = useState<null | "escaneado" | "copiado">(null);
   const wakeLockRef = useRef<any>(null);
 
-  const PROMPT_PDF = `Transcribe este PDF de forma literal para poder escucharlo en una aplicación de lectura guiada por voz.
+  const PROMPT_PDF = `Transcribe este PDF de forma literal para poder escucharlo en una aplicaciÃ³n de lectura guiada por voz.
 
-Primero quiero SOLO la transcripción del contenido principal del documento, respetando el orden, títulos, apartados y párrafos.
+Primero quiero SOLO la transcripciÃ³n del contenido principal del documento, respetando el orden, tÃ­tulos, apartados y pÃ¡rrafos.
 
-No resumas el texto principal y no añadas explicaciones dentro de la transcripción, salvo que sea necesario indicar que hay una imagen, tabla o elemento visual.
+No resumas el texto principal y no aÃ±adas explicaciones dentro de la transcripciÃ³n, salvo que sea necesario indicar que hay una imagen, tabla o elemento visual.
 
-Si hay imágenes, tablas, gráficos o elementos visuales, añade en el punto correspondiente:
+Si hay imÃ¡genes, tablas, grÃ¡ficos o elementos visuales, aÃ±ade en el punto correspondiente:
 
-'Descripción de la imagen:'
+'DescripciÃ³n de la imagen:'
 
-seguido de una descripción breve entre paréntesis de unas 15 a 20 palabras.
+seguido de una descripciÃ³n breve entre parÃ©ntesis de unas 15 a 20 palabras.
 
-Después de terminar toda la transcripción literal, añade una sección final llamada:
+DespuÃ©s de terminar toda la transcripciÃ³n literal, aÃ±ade una secciÃ³n final llamada:
 
 'Resumen visual del PDF'
 
-En esa sección final, haz un resumen breve de los elementos visuales importantes del documento: imágenes, tablas, gráficos, esquemas, sellos, firmas o cualquier elemento que ayude a entender el PDF.
+En esa secciÃ³n final, haz un resumen breve de los elementos visuales importantes del documento: imÃ¡genes, tablas, grÃ¡ficos, esquemas, sellos, firmas o cualquier elemento que ayude a entender el PDF.
 
 Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
 
@@ -100,15 +100,15 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   const limpiarTextoPdf = (t: string) => {
     return t
       .replace(/\r/g, "")
-      // Une palabras cortadas por guión al final de línea: "radio-\ndiagnóstico" → "radiodiagnóstico"
+      // Une palabras cortadas por guiÃ³n al final de lÃ­nea: "radio-\ndiagnÃ³stico" â†’ "radiodiagnÃ³stico"
       .replace(/-\n(\S)/g, "$1")
-      // Une líneas que no terminan en signo de puntuación fuerte (probable salto de línea artificial)
+      // Une lÃ­neas que no terminan en signo de puntuaciÃ³n fuerte (probable salto de lÃ­nea artificial)
       .replace(/([^\n\.\!\?\:;])\n(?!\n)(\S)/g, "$1 $2")
-      // Colapsa 3+ saltos de línea a doble salto (párrafo)
+      // Colapsa 3+ saltos de lÃ­nea a doble salto (pÃ¡rrafo)
       .replace(/\n{3,}/g, "\n\n")
       // Espacios extra
       .replace(/[ \t]{2,}/g, " ")
-      // Espacios antes de puntuación
+      // Espacios antes de puntuaciÃ³n
       .replace(/ +([,\.;:\!\?])/g, "$1")
       .trim();
   };
@@ -251,7 +251,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   };
 
 
-  // Lee el párrafo actual dividido en bloques cortos (una utterance por bloque).
+  // Lee el pÃ¡rrafo actual dividido en bloques cortos (una utterance por bloque).
   // Al terminar cada bloque, se resincroniza y arranca el siguiente.
   const leerParrafo = (startWord: number = 0) => {
     const synth = window.speechSynthesis;
@@ -276,7 +276,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
 
     setProgreso(`${i + 1} de ${ps.length}`);
 
-    // Render + marcado de párrafo activo
+    // Render + marcado de pÃ¡rrafo activo
     const root = lectorRef.current;
     if (root) {
       root.querySelectorAll("p").forEach((p) => {
@@ -328,14 +328,14 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
       }
     };
 
-    // ---- Lectura fluida del párrafo entero con sincronización precisa ----
+    // ---- Lectura fluida del pÃ¡rrafo entero con sincronizaciÃ³n precisa ----
     // Estrategia: boundary events como fuente de verdad; entre boundaries
     // avanzamos con tempo calibrado en vivo a partir de esos mismos eventos.
 
     if (fallbackTimerRef.current) { clearTimeout(fallbackTimerRef.current); fallbackTimerRef.current = null; }
 
     const rateActual = rateRef.current || 1;
-    // Base inicial (se recalibra con boundaries reales). Español ~65ms/char a 1x.
+    // Base inicial (se recalibra con boundaries reales). EspaÃ±ol ~65ms/char a 1x.
     let msPorCaracter = 68 / rateActual;
 
     type Punt = "coma" | "punto_coma" | "punto" | "fin" | null;
@@ -401,7 +401,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
       if (currentUttRef.current !== utt) return;
       if (!lecturaEnCursoRef.current) return;
       if (palabraIdx >= palabras.length) return;
-      // Si acaba de llegar un boundary muy reciente, dejar que él mande.
+      // Si acaba de llegar un boundary muy reciente, dejar que Ã©l mande.
       const desdeBoundary = performance.now() - ultimoBoundaryTs;
       if (boundariesRecibidos > 0 && desdeBoundary < 80) {
         programarFallback(120);
@@ -441,7 +441,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
       resaltar(idx);
       palabraIdx = idx + 1;
 
-      // Reprogramar fallback con el tempo calibrado; añadir margen en puntuación.
+      // Reprogramar fallback con el tempo calibrado; aÃ±adir margen en puntuaciÃ³n.
       let siguiente = duracionPalabra(idx);
       const t = puntDespues(idx);
       if (t === "punto" || t === "fin") siguiente += 120 / rateActual;
@@ -479,7 +479,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     if (!t) { alert("Pega un texto primero."); return; }
     const synth = window.speechSynthesis;
     if (!synth) {
-      alert("Tu navegador no permite la síntesis de voz en esta vista previa. Abre la app en una pestaña nueva o publícala para usar la lectura.");
+      alert("Tu navegador no permite la sÃ­ntesis de voz en esta vista previa. Abre la app en una pestaÃ±a nueva o publÃ­cala para usar la lectura.");
       return;
     }
     synth.cancel();
@@ -512,7 +512,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     setEstado("paused");
     liberarWakeLock();
   };
-  // Pausa total desencadenada por long-press: además desactiva el auto-scroll
+  // Pausa total desencadenada por long-press: ademÃ¡s desactiva el auto-scroll
   const pausaTotal = () => {
     pausar();
     autoScrollDesactivadoRef.current = true;
@@ -525,7 +525,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     limpiarTimersLectura();
     currentUttRef.current = null;
     window.speechSynthesis.cancel();
-    // Al pulsar Seguir manualmente, volvemos a permitir el scroll automático.
+    // Al pulsar Seguir manualmente, volvemos a permitir el scroll automÃ¡tico.
     autoScrollDesactivadoRef.current = false;
     setAvisoManual(false);
     setEstado("playing");
@@ -573,8 +573,8 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     saltarA(parrafoIdx, nuevoIdx);
   };
 
-  // Corto: tap sobre una palabra → empieza a leer desde ahí.
-  // Largo (2s) sobre cualquier zona del texto → PAUSA TOTAL + modo manual.
+  // Corto: tap sobre una palabra â†’ empieza a leer desde ahÃ­.
+  // Largo (2s) sobre cualquier zona del texto â†’ PAUSA TOTAL + modo manual.
   const iniciarPress = (e: React.PointerEvent<HTMLParagraphElement>, parrafoIdx: number) => {
     pressMovedRef.current = false;
     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
@@ -600,7 +600,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   const finPress = (e: React.PointerEvent<HTMLParagraphElement>) => {
     const timerActivo = pressTimerRef.current != null;
     cancelarPress(false);
-    // Si el timer largo no llegó a dispararse y el dedo no se movió, es un tap corto.
+    // Si el timer largo no llegÃ³ a dispararse y el dedo no se moviÃ³, es un tap corto.
     if (timerActivo && !pressMovedRef.current) {
       const w = (e.currentTarget as any).__tapWord;
       const parIdx = (e.currentTarget as any).__tapPar;
@@ -654,10 +654,10 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
         .barra-fija { position: sticky; top: 0; z-index: 40; background-color: rgba(245,240,225,0.97); backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
       `}</style>
 
-      <header className="relative overflow-hidden rounded-b-3xl shadow-lg" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <header className="relative overflow-hidden rounded-[1.8rem] shadow-lg" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <img
-          src={ximosaiHeader.url}
-          alt="XIMOSAI - Aplicación de Estudio Car"
+          src={ximosaiHeaderUrl}
+          alt="XIMOSAI - AplicaciÃ³n de Estudio Car"
           className="w-full h-auto block"
         />
       </header>
@@ -718,7 +718,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
 
             <div className="space-y-4">
               <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-lg text-xs text-blue-800 mb-2 font-medium">
-                <i className="fas fa-info-circle mr-1"></i> Si estás en el móvil y no se resalta la palabra, elige una voz que diga <strong>(Local)</strong>.
+                <i className="fas fa-info-circle mr-1"></i> Si estÃ¡s en el mÃ³vil y no se resalta la palabra, elige una voz que diga <strong>(Local)</strong>.
               </div>
 
               <div className="bg-white/50 p-4 rounded-xl shadow-sm border" style={{ borderColor: "#e8dfc8" }}>
@@ -764,10 +764,10 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               {avisoPdf === "escaneado" && (
                 <div className="rounded-xl border p-4 space-y-3" style={{ backgroundColor: "#fff3cd", borderColor: "#ffe08a", color: "#6b4a00" }}>
                   <p className="text-sm font-semibold">
-                    <i className="fas fa-triangle-exclamation mr-1"></i> Este PDF no contiene texto extraíble o parece escaneado.
+                    <i className="fas fa-triangle-exclamation mr-1"></i> Este PDF no contiene texto extraÃ­ble o parece escaneado.
                   </p>
                   <p className="text-sm">
-                    Puedes usar ChatGPT para transcribirlo. Pulsa <strong>“Copiar prompt”</strong>, sube el PDF a ChatGPT, pega el prompt y después copia el resultado en XIMOSAI Estudio Car.
+                    Puedes usar ChatGPT para transcribirlo. Pulsa <strong>â€œCopiar promptâ€</strong>, sube el PDF a ChatGPT, pega el prompt y despuÃ©s copia el resultado en XIMOSAI Estudio Car.
                   </p>
                   <button
                     type="button"
@@ -781,7 +781,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               )}
               {avisoPdf === "copiado" && (
                 <div className="rounded-lg border p-3 text-sm font-medium" style={{ backgroundColor: "#e8f5e9", borderColor: "#a5d6a7", color: "#1b5e20" }}>
-                  <i className="fas fa-check-circle mr-1"></i> Prompt copiado. Ahora sube el PDF a ChatGPT, pega el prompt y después copia el resultado en esta aplicación.
+                  <i className="fas fa-check-circle mr-1"></i> Prompt copiado. Ahora sube el PDF a ChatGPT, pega el prompt y despuÃ©s copia el resultado en esta aplicaciÃ³n.
                 </div>
               )}
 
@@ -792,7 +792,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
                 onChange={(e) => setTexto(e.target.value)}
                 className="w-full p-4 border rounded-xl bg-white/60 texto-novela text-lg focus:outline-none resize-y shadow-inner"
                 style={{ borderColor: "#c5b8a5", color: "#3e2723" }}
-                placeholder="Pega aquí el informe..."
+                placeholder="Pega aquÃ­ el informe..."
               />
 
               <button
@@ -863,21 +863,21 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               </button>
             </div>
             <div className="p-5 space-y-3 text-sm leading-relaxed">
-              <p>XIMOSAIstudiocar es una aplicación de lectura guiada pensada para estudiar documentos y páginas web de forma más cómoda.</p>
+              <p>XIMOSAIstudiocar es una aplicaciÃ³n de lectura guiada pensada para estudiar documentos y pÃ¡ginas web de forma mÃ¡s cÃ³moda.</p>
               <div>
-                <h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Cómo funciona</h3>
+                <h3 className="font-bold mb-1" style={{ color: "#d84315" }}>CÃ³mo funciona</h3>
                 <ol className="list-decimal pl-5 space-y-1">
                   <li>Toca una zona del texto para empezar a leer desde ese punto.</li>
-                  <li>La aplicación leerá en voz alta y acompañará la lectura con desplazamiento automático.</li>
-                  <li>Si quieres parar la lectura y recuperar el control manual, mantén pulsada la pantalla durante <strong>2 segundos</strong>.</li>
-                  <li>Al hacerlo, se detendrán la voz y el desplazamiento automático.</li>
-                  <li>Después podrás subir o bajar manualmente por el texto.</li>
+                  <li>La aplicaciÃ³n leerÃ¡ en voz alta y acompaÃ±arÃ¡ la lectura con desplazamiento automÃ¡tico.</li>
+                  <li>Si quieres parar la lectura y recuperar el control manual, mantÃ©n pulsada la pantalla durante <strong>2 segundos</strong>.</li>
+                  <li>Al hacerlo, se detendrÃ¡n la voz y el desplazamiento automÃ¡tico.</li>
+                  <li>DespuÃ©s podrÃ¡s subir o bajar manualmente por el texto.</li>
                   <li>Puedes usar los controles para pausar, continuar, retroceder 20 palabras, avanzar 20 o cambiar la velocidad.</li>
-                  <li>La lectura solo continuará cuando pulses de nuevo el botón de <strong>Seguir</strong>.</li>
+                  <li>La lectura solo continuarÃ¡ cuando pulses de nuevo el botÃ³n de <strong>Seguir</strong>.</li>
                 </ol>
               </div>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
-                <strong>Consejo para el coche:</strong> conecta el móvil al altavoz por Bluetooth, deja el móvil en un soporte visible y usa <strong>-20</strong> si te pierdes.
+                <strong>Consejo para el coche:</strong> conecta el mÃ³vil al altavoz por Bluetooth, deja el mÃ³vil en un soporte visible y usa <strong>-20</strong> si te pierdes.
               </div>
             </div>
           </div>
@@ -892,11 +892,11 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               <button onClick={() => setPrivacidadAbierta(false)} className="text-white text-xl px-2" aria-label="Cerrar"><i className="fas fa-times"></i></button>
             </div>
             <div className="p-5 space-y-4 text-sm leading-relaxed">
-              <p><strong>XIMOSAIstudiocar procesa los documentos en tu propio dispositivo.</strong> El texto de los archivos Word, PDF o TXT se lee en la memoria de la aplicación para mostrarse y escucharse.</p>
-              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Qué no hacemos</h3><ul className="list-disc pl-5 space-y-1"><li>No subimos tus documentos, texto ni audios a un servidor propio.</li><li>No creamos una cuenta de usuario ni pedimos nombre, correo o teléfono.</li><li>No vendemos ni compartimos el contenido de tus documentos.</li></ul></div>
-              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Voz y servicios externos</h3><p>La lectura usa la voz disponible en tu móvil. Si eliges una voz marcada como <strong>(Nube)</strong>, su proveedor puede procesar el texto según sus propias condiciones. Las voces <strong>(Local)</strong> evitan ese envío. Si decides usar ChatGPT para transcribir un PDF escaneado, lo haces de forma voluntaria fuera de esta aplicación.</p></div>
-              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Conservación</h3><p>El texto cargado se mantiene solo mientras utilizas la aplicación. Al cerrar o recargar la app, se elimina de su memoria. La aplicación no guarda una copia en un servidor.</p></div>
-              <p className="text-xs rounded-lg p-3" style={{ backgroundColor: "#eef6ff", color: "#23445f" }}><strong>Contacto de privacidad:</strong> ximosai@outlook.com. Esta información también se usará en la ficha de Google Play antes de publicar la app.</p>
+              <p><strong>XIMOSAIstudiocar procesa los documentos en tu propio dispositivo.</strong> El texto de los archivos Word, PDF o TXT se lee en la memoria de la aplicaciÃ³n para mostrarse y escucharse.</p>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>QuÃ© no hacemos</h3><ul className="list-disc pl-5 space-y-1"><li>No subimos tus documentos, texto ni audios a un servidor propio.</li><li>No creamos una cuenta de usuario ni pedimos nombre, correo o telÃ©fono.</li><li>No vendemos ni compartimos el contenido de tus documentos.</li></ul></div>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Voz y servicios externos</h3><p>La lectura usa la voz disponible en tu mÃ³vil. Si eliges una voz marcada como <strong>(Nube)</strong>, su proveedor puede procesar el texto segÃºn sus propias condiciones. Las voces <strong>(Local)</strong> evitan ese envÃ­o. Si decides usar ChatGPT para transcribir un PDF escaneado, lo haces de forma voluntaria fuera de esta aplicaciÃ³n.</p></div>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>ConservaciÃ³n</h3><p>El texto cargado se mantiene solo mientras utilizas la aplicaciÃ³n. Al cerrar o recargar la app, se elimina de su memoria. La aplicaciÃ³n no guarda una copia en un servidor.</p></div>
+              <p className="text-xs rounded-lg p-3" style={{ backgroundColor: "#eef6ff", color: "#23445f" }}><strong>Contacto de privacidad:</strong> ximosai@outlook.com. Esta informaciÃ³n tambiÃ©n se usarÃ¡ en la ficha de Google Play antes de publicar la app.</p>
             </div>
           </div>
         </div>
@@ -904,3 +904,9 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     </div>
   );
 }
+
+45b3cc8aba43ffa24ee2ed293b5c739ae4a33af2
+-encodedCommand
+dAByAGUAZQA=
+fatal: ambiguous argument 'dAByAGUAZQA=': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
