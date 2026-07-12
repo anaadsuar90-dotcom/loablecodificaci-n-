@@ -905,8 +905,3 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   );
 }
 
-45b3cc8aba43ffa24ee2ed293b5c739ae4a33af2
--encodedCommand
-dAByAGUAZQA=
-fatal: ambiguous argument 'dAByAGUAZQA=': unknown revision or path not in the working tree.
-Use '--' to separate paths from revisions, like this:
