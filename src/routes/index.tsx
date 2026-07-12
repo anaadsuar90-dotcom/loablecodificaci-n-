@@ -64,6 +64,7 @@ function LectorGuiado() {
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressMovedRef = useRef(false);
   const [instruccionesAbiertas, setInstruccionesAbiertas] = useState(false);
+  const [privacidadAbierta, setPrivacidadAbierta] = useState(false);
   const [avisoPdf, setAvisoPdf] = useState<null | "escaneado" | "copiado">(null);
   const wakeLockRef = useRef<any>(null);
 
@@ -802,6 +803,9 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               >
                 <i className="fas fa-book-open"></i> Instrucciones de XIMOSAIstudiocar
               </button>
+              <button type="button" onClick={() => setPrivacidadAbierta(true)} className="w-full p-3 rounded-xl border font-semibold text-sm flex items-center justify-center gap-2" style={{ borderColor: "#8aa1b5", color: "#23445f", backgroundColor: "rgba(235,245,255,0.65)" }}>
+                <i className="fas fa-shield-alt"></i> Privacidad y datos
+              </button>
             </div>
           </>
         )}
@@ -833,6 +837,9 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               aria-label="Instrucciones"
             >
               <i className="fas fa-question"></i>
+            </button>
+            <button type="button" onClick={() => setPrivacidadAbierta(true)} className="fixed bottom-4 left-4 z-40 h-12 rounded-full shadow-lg px-4 flex items-center justify-center gap-2 text-sm font-bold" style={{ backgroundColor: "#23445f", color: "white" }} aria-label="Privacidad y datos">
+              <i className="fas fa-shield-alt"></i> Datos
             </button>
           </>
         )}
@@ -872,6 +879,24 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
                 <strong>Consejo para el coche:</strong> conecta el móvil al altavoz por Bluetooth, deja el móvil en un soporte visible y usa <strong>-20</strong> si te pierdes.
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {privacidadAbierta && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)" }} onClick={() => setPrivacidadAbierta(false)}>
+          <div className="bg-white w-full sm:max-w-lg max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-2xl" style={{ color: "#2c2825" }} onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 flex items-center justify-between p-4 border-b" style={{ backgroundColor: "#23445f", color: "white" }}>
+              <h2 className="font-bold text-lg">Privacidad y datos</h2>
+              <button onClick={() => setPrivacidadAbierta(false)} className="text-white text-xl px-2" aria-label="Cerrar"><i className="fas fa-times"></i></button>
+            </div>
+            <div className="p-5 space-y-4 text-sm leading-relaxed">
+              <p><strong>XIMOSAIstudiocar procesa los documentos en tu propio dispositivo.</strong> El texto de los archivos Word, PDF o TXT se lee en la memoria de la aplicación para mostrarse y escucharse.</p>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Qué no hacemos</h3><ul className="list-disc pl-5 space-y-1"><li>No subimos tus documentos, texto ni audios a un servidor propio.</li><li>No creamos una cuenta de usuario ni pedimos nombre, correo o teléfono.</li><li>No vendemos ni compartimos el contenido de tus documentos.</li></ul></div>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Voz y servicios externos</h3><p>La lectura usa la voz disponible en tu móvil. Si eliges una voz marcada como <strong>(Nube)</strong>, su proveedor puede procesar el texto según sus propias condiciones. Las voces <strong>(Local)</strong> evitan ese envío. Si decides usar ChatGPT para transcribir un PDF escaneado, lo haces de forma voluntaria fuera de esta aplicación.</p></div>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Conservación</h3><p>El texto cargado se mantiene solo mientras utilizas la aplicación. Al cerrar o recargar la app, se elimina de su memoria. La aplicación no guarda una copia en un servidor.</p></div>
+              <p className="text-xs rounded-lg p-3" style={{ backgroundColor: "#eef6ff", color: "#23445f" }}><strong>Contacto de privacidad:</strong> ximosai@outlook.com. Esta información también se usará en la ficha de Google Play antes de publicar la app.</p>
             </div>
           </div>
         </div>
