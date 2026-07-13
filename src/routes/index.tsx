@@ -34,9 +34,21 @@ function escaparHTML(texto: string) {
   return texto.replace(/[&<>"']/g, (m) => mapa[m]);
 }
 
+
+function obtenerVozEspanolaLocal() {
+  if (typeof window === "undefined" || !window.speechSynthesis) return null;
+  const vocesEspanolasLocales = window.speechSynthesis
+    .getVoices()
+    .filter((voz) => voz.localService && /^es(?:-|_)/i.test(voz.lang));
+
+  return (
+    vocesEspanolasLocales.find((voz) => /^es(?:-|_)ES$/i.test(voz.lang)) ??
+    vocesEspanolasLocales[0] ??
+    null
+  );
+}
+
 function LectorGuiado() {
-  const [voces, setVoces] = useState<SpeechSynthesisVoice[]>([]);
-  const [vozSeleccionada, setVozSeleccionada] = useState("");
   const [rate, setRate] = useState(1);
   const [texto, setTexto] = useState("");
   const [modoLectura, setModoLectura] = useState(false);
@@ -50,7 +62,7 @@ function LectorGuiado() {
   const lecturaEnCursoRef = useRef(false);
   const indiceRef = useRef(0);
   const parrafosRef = useRef<string[]>([]);
-  const vozRef = useRef("");
+  const vozLocalRef = useRef<SpeechSynthesisVoice | null>(null);
   const rateRef = useRef(1);
   const palabrasActualesRef = useRef<{ start: number; length: number }[]>([]);
   const palabraActualRef = useRef(0);
@@ -116,7 +128,6 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
 
   useEffect(() => { indiceRef.current = indice; }, [indice]);
   useEffect(() => { parrafosRef.current = parrafos; }, [parrafos]);
-  useEffect(() => { vozRef.current = vozSeleccionada; }, [vozSeleccionada]);
   useEffect(() => {
     rateRef.current = rate;
     // Si estamos leyendo, reiniciamos desde la palabra actual para aplicar la nueva velocidad
@@ -136,16 +147,12 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     const cargar = () => {
-      const v = window.speechSynthesis.getVoices();
-      if (v.length > 0) {
-        const es = v.filter((x) => x.lang.includes("es"));
-        const otras = v.filter((x) => !x.lang.includes("es"));
-        setVoces([...es, ...otras]);
-      }
+      vozLocalRef.current = obtenerVozEspanolaLocal();
     };
     cargar();
     window.speechSynthesis.onvoiceschanged = cargar;
     return () => {
+      window.speechSynthesis.onvoiceschanged = null;
       window.speechSynthesis.cancel();
       liberarWakeLock();
     };
@@ -368,10 +375,9 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     const textoUtt = textoParrafo.substring(palabras[startWord]?.start ?? 0);
     const offsetChar = palabras[startWord]?.start ?? 0;
     const utt = new SpeechSynthesisUtterance(textoUtt);
-    if (vozRef.current) {
-      const v = window.speechSynthesis.getVoices().find((x) => x.name === vozRef.current);
-      if (v) utt.voice = v;
-    }
+    const vozLocal = vozLocalRef.current ?? obtenerVozEspanolaLocal();
+    if (vozLocal) utt.voice = vozLocal;
+    utt.lang = vozLocal?.lang ?? "es-ES";
     utt.rate = rateRef.current;
 
     let palabraIdx = startWord;
@@ -482,6 +488,12 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
       alert("Tu navegador no permite la sÃ­ntesis de voz en esta vista previa. Abre la app en una pestaÃ±a nueva o publÃ­cala para usar la lectura.");
       return;
     }
+    const vozLocal = obtenerVozEspanolaLocal();
+    if (!vozLocal) {
+      alert("No se encontró una voz española local en este dispositivo. Instala o descarga una voz en español en los ajustes de síntesis de voz y vuelve a intentarlo.");
+      return;
+    }
+    vozLocalRef.current = vozLocal;
     synth.cancel();
     synth.resume();
     const ps = t.split(/\n+/).filter((p) => p.trim().length > 0);
@@ -717,25 +729,8 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
             </div>
 
             <div className="space-y-4">
-              <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-lg text-xs text-blue-800 mb-2 font-medium">
-                <i className="fas fa-info-circle mr-1"></i> Si estÃ¡s en el mÃ³vil y no se resalta la palabra, elige una voz que diga <strong>(Local)</strong>.
-              </div>
 
               <div className="bg-white/50 p-4 rounded-xl shadow-sm border" style={{ borderColor: "#e8dfc8" }}>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: "#5d4037" }}>Voz</label>
-                <select
-                  value={vozSeleccionada}
-                  onChange={(e) => setVozSeleccionada(e.target.value)}
-                  className="w-full p-2 border-b-2 bg-transparent text-sm focus:outline-none mb-4"
-                  style={{ borderColor: "#d84315" }}
-                >
-                  <option value="">{voces.length === 0 ? "Cargando voces..." : "Voz por defecto"}</option>
-                  {voces.map((v) => (
-                    <option key={v.name} value={v.name}>
-                      {v.name} {v.localService ? "(Local)" : "(Nube)"}
-                    </option>
-                  ))}
-                </select>
                 <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: "#5d4037" }}>
                   Velocidad: {rate.toFixed(1)}x
                 </label>
@@ -792,7 +787,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
                 onChange={(e) => setTexto(e.target.value)}
                 className="w-full p-4 border rounded-xl bg-white/60 texto-novela text-lg focus:outline-none resize-y shadow-inner"
                 style={{ borderColor: "#c5b8a5", color: "#3e2723" }}
-                placeholder="Pega aquÃ­ el informe..."
+                placeholder="Pega aquí el texto..."
               />
 
               <button
@@ -894,7 +889,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
             <div className="p-5 space-y-4 text-sm leading-relaxed">
               <p><strong>XIMOSAIstudiocar procesa los documentos en tu propio dispositivo.</strong> El texto de los archivos Word, PDF o TXT se lee en la memoria de la aplicaciÃ³n para mostrarse y escucharse.</p>
               <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>QuÃ© no hacemos</h3><ul className="list-disc pl-5 space-y-1"><li>No subimos tus documentos, texto ni audios a un servidor propio.</li><li>No creamos una cuenta de usuario ni pedimos nombre, correo o telÃ©fono.</li><li>No vendemos ni compartimos el contenido de tus documentos.</li></ul></div>
-              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Voz y servicios externos</h3><p>La lectura usa la voz disponible en tu mÃ³vil. Si eliges una voz marcada como <strong>(Nube)</strong>, su proveedor puede procesar el texto segÃºn sus propias condiciones. Las voces <strong>(Local)</strong> evitan ese envÃ­o. Si decides usar ChatGPT para transcribir un PDF escaneado, lo haces de forma voluntaria fuera de esta aplicaciÃ³n.</p></div>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Voz y servicios externos</h3><p>La aplicación utiliza automáticamente una voz española local instalada en tu dispositivo. Si decides usar ChatGPT para transcribir un PDF escaneado, lo haces de forma voluntaria fuera de esta aplicación.</p></div>
               <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>ConservaciÃ³n</h3><p>El texto cargado se mantiene solo mientras utilizas la aplicaciÃ³n. Al cerrar o recargar la app, se elimina de su memoria. La aplicaciÃ³n no guarda una copia en un servidor.</p></div>
               <p className="text-xs rounded-lg p-3" style={{ backgroundColor: "#eef6ff", color: "#23445f" }}><strong>Contacto de privacidad:</strong> ximosai@outlook.com. Esta informaciÃ³n tambiÃ©n se usarÃ¡ en la ficha de Google Play antes de publicar la app.</p>
             </div>
