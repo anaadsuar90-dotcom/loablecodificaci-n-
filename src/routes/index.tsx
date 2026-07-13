@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import ximosaiHeaderUrl from "@/assets/ximosai-header.jpeg";
+import {
+  COMANDOS_VOZ,
+  esComandoVoz,
+  normalizarComandoVoz,
+  type ComandoVoz,
+} from "@/lib/voice-commands";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,6 +54,23 @@ function obtenerVozEspanolaLocal() {
   );
 }
 
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onresult: ((event: {
+    results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
+  }) => void) | null;
+  start: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
 function LectorGuiado() {
   const [rate, setRate] = useState(1);
   const [texto, setTexto] = useState("");
@@ -57,12 +80,18 @@ function LectorGuiado() {
   const [estado, setEstado] = useState<"idle" | "playing" | "paused">("idle");
   const [progreso, setProgreso] = useState("A tu ritmo");
   const [avisoManual, setAvisoManual] = useState(false);
+  const [escuchaComandosActivada, setEscuchaComandosActivada] = useState(false);
+  const [microfonoEscuchando, setMicrofonoEscuchando] = useState(false);
+  const [ultimoComando, setUltimoComando] = useState("");
+  const [avisoControlVoz, setAvisoControlVoz] = useState("");
+  const [sonidoLecturaActivado, setSonidoLecturaActivado] = useState(true);
 
   const lectorRef = useRef<HTMLDivElement>(null);
   const lecturaEnCursoRef = useRef(false);
   const indiceRef = useRef(0);
   const parrafosRef = useRef<string[]>([]);
   const vozLocalRef = useRef<SpeechSynthesisVoice | null>(null);
+  const estadoRef = useRef<"idle" | "playing" | "paused">("idle");
   const rateRef = useRef(1);
   const palabrasActualesRef = useRef<{ start: number; length: number }[]>([]);
   const palabraActualRef = useRef(0);
@@ -79,6 +108,14 @@ function LectorGuiado() {
   const [privacidadAbierta, setPrivacidadAbierta] = useState(false);
   const [avisoPdf, setAvisoPdf] = useState<null | "escaneado" | "copiado">(null);
   const wakeLockRef = useRef<any>(null);
+  const escuchaComandosRef = useRef(false);
+  const reconocimientoRef = useRef<SpeechRecognitionLike | null>(null);
+  const reinicioReconocimientoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const limpiarUltimoComandoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bloqueoComandoRef = useRef({ comando: "", hasta: 0 });
+  const ejecutarComandoRef = useRef<(comando: ComandoVoz) => void>(() => undefined);
+  const sonidoLecturaRef = useRef(true);
+  const reanudarAlActivarSonidoRef = useRef(false);
 
   const PROMPT_PDF = `Transcribe este PDF de forma literal para poder escucharlo en una aplicaciÃ³n de lectura guiada por voz.
 
@@ -128,6 +165,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
 
   useEffect(() => { indiceRef.current = indice; }, [indice]);
   useEffect(() => { parrafosRef.current = parrafos; }, [parrafos]);
+  useEffect(() => { estadoRef.current = estado; }, [estado]);
   useEffect(() => {
     rateRef.current = rate;
     // Si estamos leyendo, reiniciamos desde la palabra actual para aplicar la nueva velocidad
@@ -261,6 +299,10 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   // Lee el pÃ¡rrafo actual dividido en bloques cortos (una utterance por bloque).
   // Al terminar cada bloque, se resincroniza y arranca el siguiente.
   const leerParrafo = (startWord: number = 0) => {
+    if (!sonidoLecturaRef.current) {
+      setEstado("paused");
+      return;
+    }
     const synth = window.speechSynthesis;
     const i = indiceRef.current;
     const ps = parrafosRef.current;
@@ -506,9 +548,14 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     setParrafos(ps);
     setIndice(0);
     setModoLectura(true);
-    setEstado("playing");
-    pedirWakeLock();
-    setTimeout(() => leerParrafo(0), 100);
+    if (sonidoLecturaRef.current) {
+      setEstado("playing");
+      pedirWakeLock();
+      setTimeout(() => leerParrafo(0), 100);
+    } else {
+      reanudarAlActivarSonidoRef.current = true;
+      setEstado("paused");
+    }
   };
 
   const limpiarTimersLectura = () => {
@@ -533,6 +580,11 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   };
   const reanudar = () => {
     if (!lecturaEnCursoRef.current) return;
+    if (!sonidoLecturaRef.current) {
+      reanudarAlActivarSonidoRef.current = true;
+      setEstado("paused");
+      return;
+    }
     const desde = palabraActualRef.current;
     limpiarTimersLectura();
     currentUttRef.current = null;
@@ -558,9 +610,14 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     window.speechSynthesis.cancel();
     autoScrollDesactivadoRef.current = false;
     setAvisoManual(false);
-    setEstado("playing");
-    pedirWakeLock();
-    setTimeout(() => leerParrafo(Math.max(0, palabraIdx)), 120);
+    if (sonidoLecturaRef.current) {
+      setEstado("playing");
+      pedirWakeLock();
+      setTimeout(() => leerParrafo(Math.max(0, palabraIdx)), 120);
+    } else {
+      reanudarAlActivarSonidoRef.current = true;
+      setEstado("paused");
+    }
   };
   const desplazar = (n: number) => {
     if (!lecturaEnCursoRef.current) return;
@@ -640,6 +697,218 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const iniciarDesdePrincipio = () => {
+    if (lecturaEnCursoRef.current && parrafosRef.current.length > 0) {
+      saltarA(0, 0);
+      return;
+    }
+    iniciar();
+  };
+
+  ejecutarComandoRef.current = (comando) => {
+    switch (comando) {
+      case "ximo salto":
+        desplazar(20);
+        break;
+      case "ximo vuelve":
+        desplazar(-20);
+        break;
+      case "ximo quieto":
+        if (lecturaEnCursoRef.current) pausar();
+        break;
+      case "ximo dale":
+        reanudar();
+        break;
+      case "ximo empieza":
+        iniciarDesdePrincipio();
+        break;
+    }
+  };
+
+  const desactivarEscuchaComandos = () => {
+    escuchaComandosRef.current = false;
+    setEscuchaComandosActivada(false);
+    setMicrofonoEscuchando(false);
+    if (reinicioReconocimientoRef.current) {
+      clearTimeout(reinicioReconocimientoRef.current);
+      reinicioReconocimientoRef.current = null;
+    }
+    const reconocimiento = reconocimientoRef.current;
+    reconocimientoRef.current = null;
+    if (reconocimiento) {
+      reconocimiento.onend = null;
+      reconocimiento.onstart = null;
+      reconocimiento.onresult = null;
+      reconocimiento.onerror = null;
+      try { reconocimiento.abort(); } catch { /* ignore */ }
+    }
+  };
+
+  const activarEscuchaComandos = async () => {
+    const navegador = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const ConstructorReconocimiento =
+      navegador.SpeechRecognition ?? navegador.webkitSpeechRecognition;
+
+    if (!ConstructorReconocimiento) {
+      const mensaje = "El control por voz no está disponible en este navegador o dispositivo. Puedes seguir utilizando los controles de la pantalla.";
+      setAvisoControlVoz(mensaje);
+      setEscuchaComandosActivada(false);
+      escuchaComandosRef.current = false;
+      return;
+    }
+
+    setAvisoControlVoz("");
+    escuchaComandosRef.current = true;
+    setEscuchaComandosActivada(true);
+
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const permiso = await navigator.mediaDevices.getUserMedia({ audio: true });
+        permiso.getTracks().forEach((track) => track.stop());
+      }
+    } catch {
+      escuchaComandosRef.current = false;
+      setEscuchaComandosActivada(false);
+      setAvisoControlVoz("No se ha concedido permiso para usar el micrófono. Puedes activarlo desde los permisos del navegador.");
+      return;
+    }
+
+    if (!escuchaComandosRef.current) return;
+
+    const reconocimiento = new ConstructorReconocimiento();
+    reconocimiento.continuous = true;
+    reconocimiento.interimResults = false;
+    reconocimiento.lang = "es-ES";
+    reconocimiento.maxAlternatives = 1;
+
+    const iniciarReconocimiento = () => {
+      if (!escuchaComandosRef.current || reconocimientoRef.current !== reconocimiento) return;
+      try {
+        reconocimiento.start();
+      } catch {
+        if (escuchaComandosRef.current) {
+          reinicioReconocimientoRef.current = setTimeout(iniciarReconocimiento, 500);
+        }
+      }
+    };
+
+    reconocimiento.onstart = () => {
+      if (escuchaComandosRef.current) setMicrofonoEscuchando(true);
+    };
+    reconocimiento.onresult = (event) => {
+      for (let i = event.results.length - 1; i >= 0; i--) {
+        const resultado = event.results[i];
+        if (!resultado?.isFinal) continue;
+        const comandoNormalizado = normalizarComandoVoz(resultado[0]?.transcript ?? "");
+        if (!esComandoVoz(comandoNormalizado)) return;
+
+        const comando = comandoNormalizado;
+        const ahora = Date.now();
+        if (
+          bloqueoComandoRef.current.comando === comando &&
+          ahora < bloqueoComandoRef.current.hasta
+        ) {
+          return;
+        }
+        bloqueoComandoRef.current = { comando, hasta: ahora + 2000 };
+        setUltimoComando(COMANDOS_VOZ[comando]);
+        if (limpiarUltimoComandoRef.current) clearTimeout(limpiarUltimoComandoRef.current);
+        limpiarUltimoComandoRef.current = setTimeout(() => setUltimoComando(""), 4000);
+        ejecutarComandoRef.current(comando);
+        return;
+      }
+    };
+    reconocimiento.onerror = (event) => {
+      setMicrofonoEscuchando(false);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        escuchaComandosRef.current = false;
+        setEscuchaComandosActivada(false);
+        setAvisoControlVoz("No se ha concedido permiso para usar el micrófono. Puedes activarlo desde los permisos del navegador.");
+      }
+    };
+    reconocimiento.onend = () => {
+      setMicrofonoEscuchando(false);
+      if (escuchaComandosRef.current) {
+        reinicioReconocimientoRef.current = setTimeout(iniciarReconocimiento, 350);
+      }
+    };
+
+    reconocimientoRef.current = reconocimiento;
+    iniciarReconocimiento();
+  };
+
+  const alternarEscuchaComandos = () => {
+    if (escuchaComandosRef.current) desactivarEscuchaComandos();
+    else void activarEscuchaComandos();
+  };
+
+  const alternarSonidoLectura = () => {
+    if (sonidoLecturaRef.current) {
+      reanudarAlActivarSonidoRef.current =
+        lecturaEnCursoRef.current && estadoRef.current === "playing";
+      sonidoLecturaRef.current = false;
+      setSonidoLecturaActivado(false);
+      if (lecturaEnCursoRef.current) pausar();
+      return;
+    }
+
+    sonidoLecturaRef.current = true;
+    setSonidoLecturaActivado(true);
+    if (reanudarAlActivarSonidoRef.current && lecturaEnCursoRef.current) {
+      reanudarAlActivarSonidoRef.current = false;
+      setTimeout(reanudar, 50);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      escuchaComandosRef.current = false;
+      if (reinicioReconocimientoRef.current) clearTimeout(reinicioReconocimientoRef.current);
+      if (limpiarUltimoComandoRef.current) clearTimeout(limpiarUltimoComandoRef.current);
+      try { reconocimientoRef.current?.abort(); } catch { /* ignore */ }
+    };
+  }, []);
+
+  const controlesVoz = (
+    <div className="rounded-xl border p-3 space-y-2" style={{ backgroundColor: "rgba(255,255,255,0.55)", borderColor: "#c5b8a5" }}>
+      <button
+        type="button"
+        onClick={alternarEscuchaComandos}
+        className="w-full p-3 rounded-xl font-bold text-sm"
+        style={{ backgroundColor: escuchaComandosActivada ? "#1565c0" : "#e0e0e0", color: escuchaComandosActivada ? "white" : "#3e2723" }}
+      >
+        🎙️ Escucha de comandos: {escuchaComandosActivada ? "Activada" : "Desactivada"}
+      </button>
+      {escuchaComandosActivada && (
+        <div className="text-center text-xs font-semibold" style={{ color: microfonoEscuchando ? "#1b5e20" : "#6b4a00" }}>
+          <span aria-hidden="true">{microfonoEscuchando ? "●" : "○"}</span>{" "}
+          {microfonoEscuchando ? "Micrófono escuchando" : "Preparando micrófono…"}
+        </div>
+      )}
+      {ultimoComando && (
+        <div className="text-center text-xs font-semibold" style={{ color: "#1565c0" }}>
+          Último comando: “{ultimoComando}”
+        </div>
+      )}
+      {avisoControlVoz && (
+        <div className="rounded-lg border p-2 text-xs" style={{ backgroundColor: "#fff3cd", borderColor: "#ffe08a", color: "#6b4a00" }}>
+          {avisoControlVoz}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={alternarSonidoLectura}
+        className="w-full p-3 rounded-xl font-bold text-sm border"
+        style={{ backgroundColor: sonidoLecturaActivado ? "#e8f5e9" : "#eeeeee", borderColor: sonidoLecturaActivado ? "#81c784" : "#bdbdbd", color: "#3e2723" }}
+      >
+        🔊 Sonido de lectura: {sonidoLecturaActivado ? "Activado" : "Desactivado"}
+      </button>
+    </div>
+  );
+
   return (
     <div
       className="min-h-screen pb-12"
@@ -714,6 +983,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
                 <i className="fas fa-hand-paper mr-1"></i> Lectura pausada. Puedes moverte por el texto y usar los controles. Pulsa <strong>Seguir</strong> para continuar.
               </div>
             )}
+            <div className="mt-3">{controlesVoz}</div>
           </div>
         </div>
       )}
@@ -726,6 +996,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
                 <i className="fas fa-headphones"></i> Escuchar Texto
               </button>
               <div className="text-center text-xs font-bold mt-2" style={{ color: "#5d4037" }}>{progreso}</div>
+              {controlesVoz}
             </div>
 
             <div className="space-y-4">
@@ -874,6 +1145,18 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
                 <strong>Consejo para el coche:</strong> conecta el mÃ³vil al altavoz por Bluetooth, deja el mÃ³vil en un soporte visible y usa <strong>-20</strong> si te pierdes.
               </div>
+              <div className="rounded-lg border p-3" style={{ backgroundColor: "#eef6ff", borderColor: "#90caf9" }}>
+                <h3 className="font-bold mb-2" style={{ color: "#1565c0" }}>CONTROL POR VOZ</h3>
+                <p className="mb-2">Activa “Escucha de comandos” para controlar la lectura sin tocar la pantalla.</p>
+                <ul className="space-y-1">
+                  <li>Di <strong>“Ximo salto”</strong> para avanzar 20 palabras.</li>
+                  <li>Di <strong>“Ximo vuelve”</strong> para retroceder 20 palabras.</li>
+                  <li>Di <strong>“Ximo quieto”</strong> para pausar.</li>
+                  <li>Di <strong>“Ximo dale”</strong> para continuar.</li>
+                  <li>Di <strong>“Ximo empieza”</strong> para comenzar de nuevo desde el principio.</li>
+                </ul>
+                <p className="mt-2 text-xs">La aplicación solo utiliza el micrófono cuando la escucha de comandos está activada. Utilizamos frases que comienzan por “Ximo” para reducir activaciones accidentales.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -899,4 +1182,3 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     </div>
   );
 }
-
