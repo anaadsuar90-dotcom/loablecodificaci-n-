@@ -7,6 +7,13 @@ import {
   normalizarComandoVoz,
   type ComandoVoz,
 } from "@/lib/voice-commands";
+import {
+  consumirContenidoCompartido,
+  registrarServiceWorker,
+  type ContenidoCompartido,
+} from "@/lib/shared-content";
+
+const TEXTO_SESION_KEY = "ximosai-texto-sesion";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -85,8 +92,14 @@ function LectorGuiado() {
   const [ultimoComando, setUltimoComando] = useState("");
   const [avisoControlVoz, setAvisoControlVoz] = useState("");
   const [sonidoLecturaActivado, setSonidoLecturaActivado] = useState(true);
+  const [contenidoCompartidoPendiente, setContenidoCompartidoPendiente] =
+    useState<ContenidoCompartido | null>(null);
+  const [mensajeContenidoCompartido, setMensajeContenidoCompartido] = useState("");
+  const [errorContenidoCompartido, setErrorContenidoCompartido] = useState("");
 
   const lectorRef = useRef<HTMLDivElement>(null);
+  const textoRef = useRef("");
+  const ignorarPrimeraPersistenciaRef = useRef(true);
   const lecturaEnCursoRef = useRef(false);
   const indiceRef = useRef(0);
   const parrafosRef = useRef<string[]>([]);
@@ -166,6 +179,26 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
   useEffect(() => { indiceRef.current = indice; }, [indice]);
   useEffect(() => { parrafosRef.current = parrafos; }, [parrafos]);
   useEffect(() => { estadoRef.current = estado; }, [estado]);
+  useEffect(() => { textoRef.current = texto; }, [texto]);
+  useEffect(() => {
+    try {
+      const textoGuardado = window.sessionStorage.getItem(TEXTO_SESION_KEY);
+      if (textoGuardado) {
+        textoRef.current = textoGuardado;
+        setTexto(textoGuardado);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    if (ignorarPrimeraPersistenciaRef.current) {
+      ignorarPrimeraPersistenciaRef.current = false;
+      return;
+    }
+    try {
+      if (texto) window.sessionStorage.setItem(TEXTO_SESION_KEY, texto);
+      else window.sessionStorage.removeItem(TEXTO_SESION_KEY);
+    } catch { /* ignore */ }
+  }, [texto]);
   useEffect(() => {
     rateRef.current = rate;
     // Si estamos leyendo, reiniciamos desde la palabra actual para aplicar la nueva velocidad
@@ -225,25 +258,34 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [estado]);
 
-  const manejarArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const procesarArchivo = async (file: File) => {
     setAvisoPdf(null);
     const nombre = file.name.toLowerCase();
-    if (nombre.endsWith(".docx")) {
-      const buf = await file.arrayBuffer();
-      // @ts-expect-error - no types for browser build
-      const mammoth = await import("mammoth/mammoth.browser.js");
+    const tipo = file.type.toLowerCase();
+    const esDocx =
+      nombre.endsWith(".docx") ||
+      tipo === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const esTxt = nombre.endsWith(".txt") || tipo === "text/plain";
+    const esPdf = nombre.endsWith(".pdf") || tipo === "application/pdf";
+    const esDocAntiguo = nombre.endsWith(".doc") || tipo === "application/msword";
+
+    if (esDocx) {
       try {
+        const buf = await file.arrayBuffer();
+        // @ts-expect-error - no types for browser build
+        const mammoth = await import("mammoth/mammoth.browser.js");
         const r = await (mammoth as any).extractRawText({ arrayBuffer: buf });
         setTexto(r.value);
+        return "correcto" as const;
       } catch {
         alert("Error al leer el Word.");
+        return "error" as const;
       }
-    } else if (nombre.endsWith(".txt")) {
+    } else if (esTxt) {
       const r = await file.text();
       setTexto(r);
-    } else if (nombre.endsWith(".pdf")) {
+      return "correcto" as const;
+    } else if (esPdf) {
       try {
         const buf = await file.arrayBuffer();
         // @ts-expect-error - no types for pdf.mjs subpath
@@ -284,16 +326,98 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
         if (limpio.replace(/\s/g, "").length < 20) {
           setAvisoPdf("escaneado");
           setTexto("");
+          return "escaneado" as const;
         } else {
           setTexto(limpio);
+          return "correcto" as const;
         }
       } catch {
         setAvisoPdf("escaneado");
+        return "escaneado" as const;
       }
     }
+    if (esDocAntiguo) return "doc-antiguo" as const;
+    return "incompatible" as const;
+  };
+
+  const manejarArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await procesarArchivo(file);
     // reset para poder subir el mismo archivo otra vez
     e.target.value = "";
   };
+
+  const aplicarContenidoCompartido = async (contenido: ContenidoCompartido) => {
+    setMensajeContenidoCompartido("");
+    setErrorContenidoCompartido("");
+    const archivo = contenido.files?.[0];
+
+    if (archivo) {
+      const resultado = await procesarArchivo(archivo);
+      if (resultado === "correcto") {
+        setMensajeContenidoCompartido("Contenido recibido correctamente. Ya puedes comenzar la lectura.");
+        return;
+      }
+      if (resultado === "doc-antiguo") {
+        setErrorContenidoCompartido("Los archivos DOC antiguos no pueden abrirse todavía. Guárdalo como DOCX o TXT y vuelve a compartirlo.");
+        return;
+      }
+      if (resultado === "escaneado") return;
+      setErrorContenidoCompartido("Este tipo de contenido no puede abrirse todavía en XIMOSAI Estudio Car.");
+      return;
+    }
+
+    const partes = [contenido.title, contenido.text, contenido.url]
+      .map((parte) => parte?.trim() ?? "")
+      .filter((parte, indice, todas) => parte && todas.indexOf(parte) === indice);
+    if (partes.length === 0) {
+      setErrorContenidoCompartido("Este tipo de contenido no puede abrirse todavía en XIMOSAI Estudio Car.");
+      return;
+    }
+
+    const nuevoTexto = partes.join("\n\n");
+    textoRef.current = nuevoTexto;
+    setTexto(nuevoTexto);
+    setMensajeContenidoCompartido("Contenido recibido correctamente. Ya puedes comenzar la lectura.");
+  };
+
+  useEffect(() => {
+    void registrarServiceWorker().catch(() => {
+      // La aplicación sigue funcionando aunque el navegador no permita instalar la PWA.
+    });
+  }, []);
+
+  useEffect(() => {
+    const parametros = new URLSearchParams(window.location.search);
+    const vieneDeCompartir = parametros.get("share-target") === "1";
+    const errorAlCompartir = parametros.get("share-error") === "1";
+    if (!vieneDeCompartir && !errorAlCompartir) return;
+
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash}`);
+    if (errorAlCompartir) {
+      setErrorContenidoCompartido("Este tipo de contenido no puede abrirse todavía en XIMOSAI Estudio Car.");
+      return;
+    }
+
+    void consumirContenidoCompartido()
+      .then((contenido) => {
+        if (!contenido) {
+          setErrorContenidoCompartido("Este tipo de contenido no puede abrirse todavía en XIMOSAI Estudio Car.");
+          return;
+        }
+        if (textoRef.current.trim()) {
+          setContenidoCompartidoPendiente(contenido);
+          return;
+        }
+        void aplicarContenidoCompartido(contenido);
+      })
+      .catch(() => {
+        setErrorContenidoCompartido("Este tipo de contenido no puede abrirse todavía en XIMOSAI Estudio Car.");
+      });
+    // Solo debe consumirse una vez al abrir la aplicación desde Compartir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   // Lee el pÃ¡rrafo actual dividido en bloques cortos (una utterance por bloque).
@@ -1001,6 +1125,17 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
 
             <div className="space-y-4">
 
+              {mensajeContenidoCompartido && (
+                <div className="rounded-lg border p-3 text-sm font-semibold" style={{ backgroundColor: "#e8f5e9", borderColor: "#81c784", color: "#1b5e20" }}>
+                  <i className="fas fa-check-circle mr-1"></i> {mensajeContenidoCompartido}
+                </div>
+              )}
+              {errorContenidoCompartido && (
+                <div className="rounded-lg border p-3 text-sm font-semibold" style={{ backgroundColor: "#fff3cd", borderColor: "#ffe08a", color: "#6b4a00" }}>
+                  <i className="fas fa-triangle-exclamation mr-1"></i> {errorContenidoCompartido}
+                </div>
+              )}
+
               <div className="bg-white/50 p-4 rounded-xl shadow-sm border" style={{ borderColor: "#e8dfc8" }}>
                 <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: "#5d4037" }}>
                   Velocidad: {rate.toFixed(1)}x
@@ -1023,8 +1158,8 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
                 style={{ borderColor: "#c5b8a5" }}
               >
                 <i className="fas fa-file-lines text-4xl mb-2" style={{ color: "#d84315" }}></i>
-                <span className="font-bold text-center" style={{ color: "#5d4037" }}>Subir documento Word o PDF</span>
-                <input id="file-upload" type="file" accept=".docx,.txt,.pdf" className="hidden" onChange={manejarArchivo} />
+                <span className="font-bold text-center" style={{ color: "#5d4037" }}>Subir documento Word, PDF o TXT</span>
+                <input id="file-upload" type="file" accept=".doc,.docx,.txt,.pdf" className="hidden" onChange={manejarArchivo} />
               </label>
 
               {avisoPdf === "escaneado" && (
@@ -1157,6 +1292,43 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
                 </ul>
                 <p className="mt-2 text-xs">La aplicación solo utiliza el micrófono cuando la escucha de comandos está activada. Utilizamos frases que comienzan por “Ximo” para reducir activaciones accidentales.</p>
               </div>
+              <div className="rounded-lg border p-3" style={{ backgroundColor: "#f3e5f5", borderColor: "#ce93d8" }}>
+                <h3 className="font-bold mb-2" style={{ color: "#6a1b9a" }}>COMPARTIR CON XIMOSAI</h3>
+                <p>Puedes enviar textos y documentos desde WhatsApp y otras aplicaciones.</p>
+                <p className="mt-2">Pulsa Compartir, selecciona <strong>“XIMOSAI Estudio Car”</strong> y el contenido se abrirá preparado para su lectura.</p>
+                <p className="mt-2">Puedes compartir texto, enlaces, PDF, Word y TXT.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {contenidoCompartidoPendiente && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.65)" }}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" style={{ color: "#2c2825" }}>
+            <h2 className="text-lg font-bold mb-3">Contenido compartido</h2>
+            <p className="text-sm mb-5">Ya tienes un documento abierto. ¿Quieres sustituirlo por el contenido compartido?</p>
+            <div className="space-y-2">
+              <button
+                type="button"
+                className="w-full rounded-xl p-3 font-bold text-white"
+                style={{ backgroundColor: "#1565c0" }}
+                onClick={() => {
+                  const contenido = contenidoCompartidoPendiente;
+                  setContenidoCompartidoPendiente(null);
+                  void aplicarContenidoCompartido(contenido);
+                }}
+              >
+                Sí, abrir el nuevo contenido
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-xl border p-3 font-bold"
+                style={{ borderColor: "#bdbdbd" }}
+                onClick={() => setContenidoCompartidoPendiente(null)}
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
@@ -1173,6 +1345,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
               <p><strong>XIMOSAIstudiocar procesa los documentos en tu propio dispositivo.</strong> El texto de los archivos Word, PDF o TXT se lee en la memoria de la aplicaciÃ³n para mostrarse y escucharse.</p>
               <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>QuÃ© no hacemos</h3><ul className="list-disc pl-5 space-y-1"><li>No subimos tus documentos, texto ni audios a un servidor propio.</li><li>No creamos una cuenta de usuario ni pedimos nombre, correo o telÃ©fono.</li><li>No vendemos ni compartimos el contenido de tus documentos.</li></ul></div>
               <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Voz y servicios externos</h3><p>La aplicación utiliza automáticamente una voz española local instalada en tu dispositivo. Si decides usar ChatGPT para transcribir un PDF escaneado, lo haces de forma voluntaria fuera de esta aplicación.</p></div>
+              <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Contenido compartido</h3><p>Los textos y documentos recibidos desde Compartir se procesan en el dispositivo. Se guardan solo de forma temporal hasta que XIMOSAI los abre y no se conservan permanentemente sin tu autorización.</p></div>
               <div><h3 className="font-bold mb-1" style={{ color: "#d84315" }}>ConservaciÃ³n</h3><p>El texto cargado se mantiene solo mientras utilizas la aplicaciÃ³n. Al cerrar o recargar la app, se elimina de su memoria. La aplicaciÃ³n no guarda una copia en un servidor.</p></div>
               <p className="text-xs rounded-lg p-3" style={{ backgroundColor: "#eef6ff", color: "#23445f" }}><strong>Contacto de privacidad:</strong> ximosai@outlook.com. Esta informaciÃ³n tambiÃ©n se usarÃ¡ en la ficha de Google Play antes de publicar la app.</p>
             </div>
