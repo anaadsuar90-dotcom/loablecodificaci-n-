@@ -1202,7 +1202,7 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
                 className="w-full p-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-2"
                 style={{ borderColor: "#d84315", color: "#d84315", backgroundColor: "rgba(255,255,255,0.5)" }}
               >
-                <i className="fas fa-book-open"></i> Instrucciones de XIMOSAIstudiocar
+                <i className="fas fa-book-open"></i> Instrucciones de XIMOSAI Estudio Car
               </button>
               <button type="button" onClick={() => setPrivacidadAbierta(true)} className="w-full p-3 rounded-xl border font-semibold text-sm flex items-center justify-center gap-2" style={{ borderColor: "#8aa1b5", color: "#23445f", backgroundColor: "rgba(235,245,255,0.65)" }}>
                 <i className="fas fa-shield-alt"></i> Privacidad y datos
@@ -1258,27 +1258,27 @@ Deja el resultado preparado para copiar y pegar en XIMOSAI Estudio Car.`;
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 flex items-center justify-between p-4 border-b" style={{ backgroundColor: "#0f172a", color: "white" }}>
-              <h2 className="font-bold text-lg">Instrucciones de XIMOSAIstudiocar</h2>
+              <h2 className="font-bold text-lg">Instrucciones de XIMOSAI Estudio Car</h2>
               <button onClick={() => setInstruccionesAbiertas(false)} className="text-white text-xl px-2" aria-label="Cerrar">
                 <i className="fas fa-times"></i>
               </button>
             </div>
             <div className="p-5 space-y-3 text-sm leading-relaxed">
-              <p>XIMOSAIstudiocar es una aplicaciÃ³n de lectura guiada pensada para estudiar documentos y pÃ¡ginas web de forma mÃ¡s cÃ³moda.</p>
+              <p>XIMOSAI Estudio Car es una aplicación de lectura guiada pensada para estudiar documentos y páginas web de forma más cómoda.</p>
               <div>
-                <h3 className="font-bold mb-1" style={{ color: "#d84315" }}>CÃ³mo funciona</h3>
+                <h3 className="font-bold mb-1" style={{ color: "#d84315" }}>Cómo funciona</h3>
                 <ol className="list-decimal pl-5 space-y-1">
                   <li>Toca una zona del texto para empezar a leer desde ese punto.</li>
-                  <li>La aplicaciÃ³n leerÃ¡ en voz alta y acompaÃ±arÃ¡ la lectura con desplazamiento automÃ¡tico.</li>
-                  <li>Si quieres parar la lectura y recuperar el control manual, mantÃ©n pulsada la pantalla durante <strong>2 segundos</strong>.</li>
-                  <li>Al hacerlo, se detendrÃ¡n la voz y el desplazamiento automÃ¡tico.</li>
-                  <li>DespuÃ©s podrÃ¡s subir o bajar manualmente por el texto.</li>
+                  <li>La aplicación leerá en voz alta y acompañará la lectura con desplazamiento automático.</li>
+                  <li>Si quieres parar la lectura y recuperar el control manual, mantén pulsada la pantalla durante <strong>2 segundos</strong>.</li>
+                  <li>Al hacerlo, se detendrán la voz y el desplazamiento automático.</li>
+                  <li>Después podrás subir o bajar manualmente por el texto.</li>
                   <li>Puedes usar los controles para pausar, continuar, retroceder 20 palabras, avanzar 20 o cambiar la velocidad.</li>
-                  <li>La lectura solo continuarÃ¡ cuando pulses de nuevo el botÃ³n de <strong>Seguir</strong>.</li>
+                  <li>La lectura solo continuará cuando pulses de nuevo el botón de <strong>Seguir</strong>.</li>
                 </ol>
               </div>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
-                <strong>Consejo para el coche:</strong> conecta el mÃ³vil al altavoz por Bluetooth, deja el mÃ³vil en un soporte visible y usa <strong>-20</strong> si te pierdes.
+                <strong>Consejo para el coche:</strong> conecta el móvil al altavoz por Bluetooth, deja el móvil en un soporte visible y usa <strong>-20</strong> si te pierdes.
               </div>
               <div className="rounded-lg border p-3" style={{ backgroundColor: "#eef6ff", borderColor: "#90caf9" }}>
                 <h3 className="font-bold mb-2" style={{ color: "#1565c0" }}>CONTROL POR VOZ</h3>
